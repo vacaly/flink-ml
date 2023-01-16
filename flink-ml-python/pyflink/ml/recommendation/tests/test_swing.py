@@ -88,7 +88,7 @@ class SwingTest(PyFlinkMLTestCase):
         swing.set_item_col("item_1") \
             .set_user_col("user_1") \
             .set_k(20) \
-            .set_max_user_num_per_item(500)\
+            .set_max_user_num_per_item(500) \
             .set_min_user_behavior(20) \
             .set_max_user_behavior(50) \
             .set_alpha1(5) \
