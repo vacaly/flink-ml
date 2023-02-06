@@ -19,8 +19,9 @@ import io
 import os
 import sys
 from platform import python_version
-from setuptools import setup
 from shutil import copytree, rmtree
+
+from setuptools import setup
 
 if sys.version_info < (3, 6) or sys.version_info >= (3, 9):
     print("Only Python versions between 3.6 and 3.8 (inclusive) are supported for Flink ML. "
@@ -86,6 +87,7 @@ try:
 
     PACKAGES = ['pyflink',
                 'pyflink.ml',
+<<<<<<< HEAD
                 'pyflink.ml.core',
                 'pyflink.ml.lib',
                 'pyflink.ml.lib.classification',
@@ -96,7 +98,16 @@ try:
                 'pyflink.ml.lib.recommendation',
                 'pyflink.ml.lib.stats',
                 'pyflink.ml.lib',
+=======
+                'pyflink.ml.classification',
+                'pyflink.ml.clustering',
+                'pyflink.ml.evaluation',
+                'pyflink.ml.feature',
+                'pyflink.ml.regression',
+                'pyflink.ml.stats',
+>>>>>>> 3f62235 ([FLINK-30865] Make pyflink-ml modules consistent with Flink ML Java library packages)
                 'pyflink.ml.util',
+                'pyflink.ml.common',
                 'pyflink.lib',
                 'pyflink.examples']
 
