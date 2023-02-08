@@ -18,12 +18,9 @@
 
 package org.apache.flink.ml.feature.stringindexer;
 
-import org.apache.flink.api.common.restartstrategy.RestartStrategies;
-import org.apache.flink.configuration.Configuration;
 import org.apache.flink.ml.common.param.HasHandleInvalid;
 import org.apache.flink.ml.util.ReadWriteUtils;
 import org.apache.flink.ml.util.TestUtils;
-import org.apache.flink.streaming.api.environment.ExecutionCheckpointingOptions;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
@@ -42,6 +39,8 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
@@ -62,32 +61,34 @@ public class StringIndexerTest extends AbstractTestBase {
             Arrays.asList(
                     Row.of("a", 2.0, 0.0, 3.0),
                     Row.of("b", 1.0, 1.0, 2.0),
-                    Row.of("e", 2.0, 4.0, 3.0));
+                    Row.of("e", 2.0, 4.0, 3.0),
+                    Row.of("f", null, 4.0, 4.0),
+                    Row.of(null, null, 4.0, 4.0));
     private final List<Row> expectedAlphabeticDescPredictData =
             Arrays.asList(
                     Row.of("a", 2.0, 3.0, 0.0),
                     Row.of("b", 1.0, 2.0, 1.0),
-                    Row.of("e", 2.0, 4.0, 0.0));
+                    Row.of("e", 2.0, 4.0, 0.0),
+                    Row.of("f", null, 4.0, 4.0),
+                    Row.of(null, null, 4.0, 4.0));
     private final List<Row> expectedFreqAscPredictData =
             Arrays.asList(
                     Row.of("a", 2.0, 2.0, 3.0),
                     Row.of("b", 1.0, 3.0, 1.0),
-                    Row.of("e", 2.0, 4.0, 3.0));
+                    Row.of("e", 2.0, 4.0, 3.0),
+                    Row.of("f", null, 4.0, 4.0),
+                    Row.of(null, null, 4.0, 4.0));
     private final List<Row> expectedFreqDescPredictData =
             Arrays.asList(
                     Row.of("a", 2.0, 1.0, 0.0),
                     Row.of("b", 1.0, 0.0, 2.0),
-                    Row.of("e", 2.0, 4.0, 0.0));
+                    Row.of("e", 2.0, 4.0, 0.0),
+                    Row.of("f", null, 4.0, 4.0),
+                    Row.of(null, null, 4.0, 4.0));
 
     @Before
     public void before() {
-        Configuration config = new Configuration();
-        config.set(ExecutionCheckpointingOptions.ENABLE_CHECKPOINTS_AFTER_TASKS_FINISH, true);
-        env = StreamExecutionEnvironment.getExecutionEnvironment(config);
-        env.getConfig().enableObjectReuse();
-        env.setParallelism(4);
-        env.enableCheckpointing(100);
-        env.setRestartStrategy(RestartStrategies.noRestart());
+        env = TestUtils.getExecutionEnvironment();
         tEnv = StreamTableEnvironment.create(env);
 
         List<Row> trainData =
@@ -101,11 +102,20 @@ public class StringIndexerTest extends AbstractTestBase {
                         Row.of("b", 2.0),
                         Row.of("b", -1.0),
                         Row.of("a", -1.0),
-                        Row.of("c", -1.0));
+                        Row.of("c", -1.0),
+                        Row.of("d", null),
+                        Row.of(null, 2.0),
+                        Row.of(null, null));
         trainTable =
                 tEnv.fromDataStream(env.fromCollection(trainData)).as("inputCol1", "inputCol2");
 
-        List<Row> predictData = Arrays.asList(Row.of("a", 2.0), Row.of("b", 1.0), Row.of("e", 2.0));
+        List<Row> predictData =
+                Arrays.asList(
+                        Row.of("a", 2.0),
+                        Row.of("b", 1.0),
+                        Row.of("e", 2.0),
+                        Row.of("f", null),
+                        Row.of(null, null));
         predictTable =
                 tEnv.fromDataStream(env.fromCollection(predictData)).as("inputCol1", "inputCol2");
     }
@@ -191,12 +201,12 @@ public class StringIndexerTest extends AbstractTestBase {
             distinctStringsCol1.add(index);
             assertTrue(index >= 0 && index <= 4);
             index = (Double) r.getField(3);
-            assertTrue(index >= 0 && index <= 3);
+            assertTrue(index >= 0 && index <= 4);
             distinctStringsCol2.add(index);
         }
 
         assertEquals(3, distinctStringsCol1.size());
-        assertEquals(2, distinctStringsCol2.size());
+        assertEquals(3, distinctStringsCol2.size());
     }
 
     @Test
@@ -232,12 +242,18 @@ public class StringIndexerTest extends AbstractTestBase {
             IteratorUtils.toList(tEnv.toDataStream(output).executeAndCollect());
             fail();
         } catch (Throwable e) {
-            assertEquals(
-                    "The input contains unseen string: e. "
-                            + "See "
-                            + HasHandleInvalid.HANDLE_INVALID
-                            + " parameter for more options.",
-                    ExceptionUtils.getRootCause(e).getMessage());
+            List<String> expectedMessages =
+                    Stream.of("e", "f", "null")
+                            .map(
+                                    d ->
+                                            String.format(
+                                                    "The input contains unseen string: %s. See %s parameter for more options.",
+                                                    d, HasHandleInvalid.HANDLE_INVALID))
+                            .collect(Collectors.toList());
+            String actualMessage = ExceptionUtils.getRootCause(e).getMessage();
+            assertTrue(
+                    "Actual message is: " + actualMessage,
+                    expectedMessages.contains(actualMessage));
         }
     }
 
